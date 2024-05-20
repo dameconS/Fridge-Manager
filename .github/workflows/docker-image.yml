@@ -25,13 +25,13 @@ jobs:
           tags: tag:ci
 
     - name: Deploy to server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_SSH_HOST }}
-          username: ${{ secrets.REMOTE_SSH_USERNAME }}
-          key: ${{ secrets.REMOTE_SSH_KEY }}
-          port: ${{ secrets.REMOTE_SSH_PORT }}
-          script: |
-            cd /docker-file/Fridge-Manager
-            git pull
-            docker compose up --build -d app
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.REMOTE_SSH_HOST }}
+        username: ${{ secrets.REMOTE_SSH_USERNAME }}
+        key: ${{ secrets.REMOTE_SSH_KEY }}
+        port: ${{ secrets.REMOTE_SSH_PORT }}
+        script: |
+          cd /docker-file/Fridge-Manager
+          git pull
+          docker compose up --build -d app
