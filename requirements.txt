@@ -5,9 +5,3 @@ python-multipart
 
 sqlalchemy
 psycopg2
-
-imutils
-scipy
-opencv-python-headless
-
-pororo-ocr
