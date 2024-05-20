@@ -6,6 +6,12 @@ from sqlalchemy.orm import Session
 from . import crud, models, schemas
 from .database import SessionLocal, engine
 
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
+from PIL import Image
+from io import BytesIO
+from ultralytics import YOLO
+
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -29,6 +35,33 @@ def read_foods(food_name: str, db: Session = Depends(get_db)):
 def read_processed_foods(processed_food_name: str, db: Session = Depends(get_db)):
     processed_foods = crud.get_processed_food(db=db, processed_food_name=processed_food_name)
     return processed_foods
+
+#app = FastAPI()
+path = "./best.pt"
+model = YOLO(path)
+
+@app.post("/food_detection")
+async def predict_image(file: UploadFile = File(...)):
+    image_data = BytesIO(await file.read())
+    image = Image.open(image_data)
+    results = model(image)
+
+    response_data = []
+    
+    for r in results:
+        cls_dict = r.names  
+        for box, cls_number, conf in zip(r.boxes.xyxy, r.boxes.cls, r.boxes.conf):
+            x1, y1, x2, y2 = map(int, box.tolist())
+            cls_name = cls_dict[int(cls_number.item())]
+            conf_number = float(conf.item())
+
+            response_data.append({
+                "bbox": [x1, y1, x2, y2],
+                "cls_name": cls_name,
+                "confidence": round(conf_number, 2)
+            })
+
+    return JSONResponse(content=response_data)
 
 # @app.post("/ocr/")
 # async def ocr(file: UploadFile, db: Session = Depends(get_db)):
@@ -55,3 +88,7 @@ def read_processed_foods(processed_food_name: str, db: Session = Depends(get_db)
     
 #     except Exception as exc:
 #         raise HTTPException(status_code=500, detail=str(exc))
+
+
+
+
