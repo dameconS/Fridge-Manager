@@ -58,7 +58,7 @@ jobs:
         port: ${{ secrets.REMOTE_SSH_PORT }}
         script: |
           cd /docker-file/Fridge-Manager
-          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           docker compose pull
           docker compose up -d
           docker logout
