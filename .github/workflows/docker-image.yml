@@ -24,10 +24,11 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker images
+    - name: Build and Release
       run: |
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml push
+        docker build -t ${{secrets.DOCKERHUB_REPO}} .
+        docker tag ${{secrets.DOCKERHUB_REPO}}:latest ${{secrets.DOCKERHUB_USERNAME}}/${{secrets.DOCKERHUB_REPO}}:latest
+        docker push ${{secrets.DOCKERHUB_USERNAME}}/${{secrets.DOCKERHUB_REPO}}:latest
 
   deploy:
     
@@ -39,22 +40,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Deploy to Server
-      env:
-        HOST: ${{ secrets.SERVER_HOST }}
-        USERNAME: ${{ secrets.SERVER_USERNAME }}
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      run: |
-        echo "${{ env.SSH_PRIVATE_KEY }}" > private_key
-        chmod 600 private_key
-        scp -i private_key -o StrictHostKeyChecking=no docker-compose.yml ${{ env.USERNAME }}@${{ env.HOST }}:/docker-file/Fridge-Manager/docker-compose.yml
-        scp -i private_key -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ env.USERNAME }}@${{ env.HOST }}:/docker-file/Fridge-Manager/docker-compose.prod.yml
-        ssh -i private_key -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << EOF
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      id: deploy
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
           cd /docker-file/Fridge-Manager
-          echo ${{ env.DOCKER_PASSWORD }} | docker login -u ${{ env.DOCKER_USERNAME }} --password-stdin
-          docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull
-          docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-        EOF
-        rm private_key
+          docker compose pull
+          docker-compose up --force-recreate --build -d
+          docker image prune -f
