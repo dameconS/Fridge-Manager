@@ -34,4 +34,4 @@ jobs:
         script: |
           cd /docker-file/Fridge-Manager
           git pull
-          docker compose up --build -d app
+          docker compose up --build -d
