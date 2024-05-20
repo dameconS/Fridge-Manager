@@ -26,7 +26,7 @@ jobs:
 
     - name: Deploy to server
       run: |
-        ssh -o "StrictHostKeyChecking no" root@192.168.50.110 "
+        ssh -o StrictHostKeyChecking=no root@192.168.50.110 "
           cd /docker-file/Fridge-Manager
           git pull
           docker compose up --build -d app
