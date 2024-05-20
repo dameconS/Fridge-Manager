@@ -16,20 +16,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Tailscale
-      uses: tailscale/github-action@v2
-      with:
-        authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+    - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+            hostname: Github-actions
+            oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+            oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+            tags: tag:ci
 
     - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      id: deploy
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
+      run: |
+        ssh -o "StrictHostKeyChecking no" root@192.168.50.110 "
           cd /docker-file/Fridge-Manager
           git pull
-          docker-compose up --build -d
-          docker image prune -f
+          docker compose up --build -d app
+        "
