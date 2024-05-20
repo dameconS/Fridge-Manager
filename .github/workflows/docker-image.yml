@@ -40,15 +40,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      id: deploy
+    - name: Connect and run command on remote server
+      uses: and-fm/cloudflared-ssh-action@v3
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
+        private_key_filename: ${{ secrets.SSH_PRIVATE_KEY_FILENAME }}
+        private_key_value: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        commands: |
           cd /docker-file/Fridge-Manager
           docker compose pull
           docker-compose up --force-recreate --build -d
           docker image prune -f
+          
