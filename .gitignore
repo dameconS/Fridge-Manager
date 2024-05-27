@@ -1,5 +1,4 @@
 /test.jpg
 docker-compose.yaml
 __pycache__
-app/database.py
 database
