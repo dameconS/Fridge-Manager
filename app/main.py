@@ -12,6 +12,7 @@ from PIL import Image
 from io import BytesIO
 from ultralytics import YOLO
 import prrocr, re
+from typing import Union
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -27,12 +28,12 @@ def get_db():
     finally:
         db.close()
 
-@app.get("/findfood/{food_name}", response_model=list[schemas.FoodBasic])
+@app.get("/findfood/{food_name}", response_model=list[schemas.FoodBase])
 def read_foods(food_name: str, db: Session = Depends(get_db)):
     foods = crud.get_food(db=db, food_name=food_name)
     return foods
 
-@app.get("/findprocessedfood/{processed_food_name}", response_model=list[schemas.ProcessedFoodBasic])
+@app.get("/findprocessedfood/{processed_food_name}", response_model=list[schemas.ProcessedFoodBase])
 def read_processed_foods(processed_food_name: str, db: Session = Depends(get_db)):
     processed_foods = crud.get_processed_food(db=db, processed_food_name=processed_food_name)
     return processed_foods
@@ -64,48 +65,41 @@ async def predict_image(file: UploadFile = File(...)):
 
     return JSONResponse(content=response_data)
 
-@app.post("/ocr/")
+
+@app.post("/ocr/", response_model=list[Union[schemas.FoodBase, schemas.ProcessedFoodBase, schemas.RawFoodBase]])
 async def ocr(file: UploadFile, db: Session = Depends(get_db)):
-    try:
-        contents = await file.read()
-        UPLOAD_DIR = "app/receipt"
-        filename = f"receipt.jpg"
-        with open(os.path.join(UPLOAD_DIR, filename), "wb") as fp:
-            fp.write(contents)
-        
-        ocr = prrocr.ocr(lang="ko")
+    contents = await file.read()
+    UPLOAD_DIR = "app/receipt"
+    filename = f"receipt.jpg"
+    with open(os.path.join(UPLOAD_DIR, filename), "wb") as fp:
+        fp.write(contents)
 
-        ocr_result = ocr(filename)
-        ocr_text = ' '.join
+    ocr = prrocr.ocr(lang="ko")
 
-        pattern = re.compile(r'([가-힣\w\s\(\);]+) \d{1,3}(,\d{3})*')
+    ocr_result = ocr(contents)
 
-        matches = pattern.findall(ocr_text)
+    ocr_text = ' '.join(ocr_result)
 
-        name_list = [re.sub(r'^[^가-힣\w]+|[^가-힣\w]+$', '', match[0]).strip() for match in matches]
-        
-        result = []
+    items = re.findall(r'\b[가-힣]+\s?[가-힣]*[0-9]*[g|L]*\b', ocr_text)
 
-        # 음식 정보 순환 조회
-        for food_name in name_list:
-            foods = crud.get_food(db=db, food_name=food_name)
-            result.extend(foods)
+    foods = crud.get_all_food_name(db=db)
 
-        # 가공식품 정보 조회
-        for processed_food_name in name_list:
-            processed_foods = crud.get_processed_food(db=db, processed_food_name=processed_food_name)
-            result.extend(processed_foods)
+    import difflib
 
-        # 원재료성 식품 정보 조회
-        for raw_food_name in name_list:
-            raw_foods = crud.get_processed_food(db=db, raw_name=raw_food_name)
-            result.extend(raw_foods)
-
-        return result
+    def find_most_similar(search_list, sample_list):
+        most_similar_words = []
+        for word in search_list:
+            most_similar = difflib.get_close_matches(word, sample_list, n=1, cutoff=0.6)
+            if most_similar:
+                most_similar_words.append(most_similar[0])
+        return most_similar_words
     
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    food_list = find_most_similar(items ,foods)
 
+    response = []
 
+    for food_name in food_list:
+        result = crud.get_all_food(db=db, food_name=food_name)
+        response.append(result[0])
 
-
+    return response
