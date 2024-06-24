@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from PIL import Image
 from io import BytesIO
 from ultralytics import YOLO
+import prrocr, re
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -63,31 +64,47 @@ async def predict_image(file: UploadFile = File(...)):
 
     return JSONResponse(content=response_data)
 
-# @app.post("/ocr/")
-# async def ocr(file: UploadFile, db: Session = Depends(get_db)):
-#     try:
-#         contents = await file.read()
-#         UPLOAD_DIR = "app/receipt"
-#         filename = f"receipt.jpg"
-#         with open(os.path.join(UPLOAD_DIR, filename), "wb") as fp:
-#             fp.write(contents)
-#         name_list = scanner.ocr()
-#         result = name_list
+@app.post("/ocr/")
+async def ocr(file: UploadFile, db: Session = Depends(get_db)):
+    try:
+        contents = await file.read()
+        UPLOAD_DIR = "app/receipt"
+        filename = f"receipt.jpg"
+        with open(os.path.join(UPLOAD_DIR, filename), "wb") as fp:
+            fp.write(contents)
+        
+        ocr = prrocr.ocr(lang="ko")
 
-#         # 음식 이름 리스트를 순회하면서 데이터베이스 조회
-#         for food_name in name_list:
-#             foods = crud.get_food(db=db, food_name=food_name)
-#             result.extend(foods)
+        ocr_result = ocr(filename)
+        ocr_text = ' '.join
 
-#         # 처리된 음식 정보도 조회
-#         for processed_food_name in name_list:
-#             processed_foods = crud.get_processed_food(db=db, processed_food_name=processed_food_name)
-#             result.extend(processed_foods)
+        pattern = re.compile(r'([가-힣\w\s\(\);]+) \d{1,3}(,\d{3})*')
 
-#         return result
+        matches = pattern.findall(ocr_text)
+
+        name_list = [re.sub(r'^[^가-힣\w]+|[^가-힣\w]+$', '', match[0]).strip() for match in matches]
+        
+        result = []
+
+        # 음식 정보 순환 조회
+        for food_name in name_list:
+            foods = crud.get_food(db=db, food_name=food_name)
+            result.extend(foods)
+
+        # 가공식품 정보 조회
+        for processed_food_name in name_list:
+            processed_foods = crud.get_processed_food(db=db, processed_food_name=processed_food_name)
+            result.extend(processed_foods)
+
+        # 원재료성 식품 정보 조회
+        for raw_food_name in name_list:
+            raw_foods = crud.get_processed_food(db=db, raw_name=raw_food_name)
+            result.extend(raw_foods)
+
+        return result
     
-#     except Exception as exc:
-#         raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 
