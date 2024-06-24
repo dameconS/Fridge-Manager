@@ -2,4 +2,4 @@
 docker-compose.yaml
 __pycache__
 database
- .venv
+ .venv/
